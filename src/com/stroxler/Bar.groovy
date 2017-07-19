@@ -1,12 +1,12 @@
 #!/usr/bin/env groovy
 package com.stroxler
 
-static def squareOfTwo() {
+def squareOfTwo() {
     return 2 * 2
 }
 
 
-static def printSquareOfTwo() {
+def printSquareOfTwo() {
     println("------------")
     println("---YEAH-----")
     println("---YEAH-----")
