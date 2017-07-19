@@ -7,5 +7,15 @@ static def squareOfTwo() {
 
 
 static def printSquareOfTwo() {
-    println(squareOfTwo())
+    echo("------------")
+    echo("---YEAH-----")
+    echo("---YEAH-----")
+    echo("------------")
+    echo("------------")
+    echo(squareOfTwo())
+    echo("------------")
+    echo("---YEAH-----")
+    echo("---YEAH-----")
+    echo("------------")
+    echo("------------")
 }
