@@ -7,6 +7,3 @@ def call() {
     new Bar().printSquareOfTwo()
     echo "Goodbye from my shared library"
 }
-
-
-call()
