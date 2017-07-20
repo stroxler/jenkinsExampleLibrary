@@ -13,29 +13,49 @@ script:
 @Library("jenkinsExampleLibrary") _
 
 node {
-    stage("say hello from library") {
-        squareTwo()
-        squareTwo()
-        squareTwo()
+    stage("parallel") {
+        parallel([
+            "block a": {
+                runTask "a-1st", [], {
+                    sh "sleep 5"
+                    echo "hello from a-1st"
+                }
+                runTask "a-2nd", [], {
+                    sh "sleep 5"
+                    echo "hello from a-2nd"
+                }
+                runTask "a-3rd", [], {
+                    sh "sleep 5"
+                    echo "hello from a-3rd"
+                }
+            },
+            "block b": {
+                runTask "b-1st", ["a-1st"], {
+                    echo "hello from b-1st"
+                }
+                runTask "b-2nd", ["a-3rd"], {
+                    echo "hello from b-2nd"
+                }
+            },
+            "block c": {
+                runTask "c-1st", [], {
+                    echo "hello from c-1st"
+                }
+                runTask "c-2nd", ["a-2nd"], {
+                    echo "hello from c-2nd"
+                }
+            },
+        ])
     }
 }
 ```
 
 Then I ran both pipelines at about the same time.
 
-Since the code inside `Bar` called via `squareTwo` both sleeps for 10 seconds
-and modifies a static variable inside `Bar.Globals`, I was able to verify that
-  - the global state in `Bar.Globals` is persisted across calls to
-    `squareTwo` within a single pipeline (it's not obvious that this would
-    happen; `Globals` is not a static class, and the `Bar` instance is fresh
-    every time, so it wouldn't have been surprising to get a different
-    `Globals` in each call)
-  - the global state does *not* appear to be shared between the two
-    simultaneously running pipelines. I'm fuzzy on details about how the
-    pipeline plugin runs things, but it seems like it might be spinning up
-    a fresh jvm, or isolating different runs in some other way.
-
-As a result, it's probably possible to provide an implementation of
-an action that declares parents, and use plain old groovy / java code to
-handle thread-safe access to a hash set or hash map that tracks task state,
-in order to get a lightweight DAG runner.
+The test verifies that we are able to run two pipelines at once and
+get the desired order of execution in both copies:
+  - a1st and c1st start together
+  - c1st finishes first
+  - a1st finishes, then b1st starts and finishes while a2nd starts
+  - a2nd finishes and c2nd starts and finishes while a3rd starts
+  - a3rd starts and then b2nd runs

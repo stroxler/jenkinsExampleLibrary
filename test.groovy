@@ -1,3 +1,5 @@
+import com.stroxler.Bar
+
 import java.util.Map
 import java.util.HashMap
 
@@ -13,5 +15,5 @@ doThing "myfunction", {
     x = new HashMap<String, String>()
     x.put("woah", "cool")
     println(x.containsKey("woah"))
-    x.get("woah")
+    println(x.get("oops"))
 }

@@ -2,6 +2,15 @@
 
 import com.stroxler.Bar
 
-def call(taskName, f) {
-    new Bar().runTask(taskName, f)
+
+def call(taskName, parents, f) {
+    bar = new Bar()
+    try {
+      bar.waitForParents(taskName, parents)
+      bar.registerRunning(taskName)
+      f()
+      bar.registerSucceeded(taskName)
+    } catch (Throwable t) {
+      bar.registerFailed(taskName)
+    }
 }
