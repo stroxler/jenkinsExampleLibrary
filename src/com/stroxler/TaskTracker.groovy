@@ -1,7 +1,6 @@
 #!/usr/bin/env groovy
 package com.stroxler
 
-import java.lang.Thread
 import java.util.concurrent.ConcurrentHashMap
 import java.util.HashMap
 import java.util.Map
@@ -56,7 +55,7 @@ def parentsReady(String taskName, List<String> parents) {
 
 def waitForParents(String taskName, List<String> parents) {
     while(!parentsReady(taskName, parents)) {
-        Thread.sleep(3 * 1000)
+        sleep(1)
     }
 }
 
