@@ -1,16 +1,16 @@
 #!/usr/bin/env groovy
 
-import com.stroxler.Bar
+import com.stroxler.TaskTracker
 
 
 def call(taskName, parents, f) {
-    bar = new Bar()
+    taskTracker = new TaskTracker()
     try {
-      bar.waitForParents(taskName, parents)
-      bar.registerRunning(taskName)
+      taskTracker.waitForParents(taskName, parents)
+      taskTracker.registerRunning(taskName)
       f()
-      bar.registerSucceeded(taskName)
+      taskTracker.registerSucceeded(taskName)
     } catch (Throwable t) {
-      bar.registerFailed(taskName)
+      taskTracker.registerFailed(taskName)
     }
 }

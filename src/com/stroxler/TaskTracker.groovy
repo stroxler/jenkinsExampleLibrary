@@ -8,7 +8,7 @@ import java.util.Map
 import java.util.List
 
 
-class Globals {
+class TaskStatus {
     public static Map<String, String> taskStatuses = new ConcurrentHashMap<>()
 
     @NonCPS
@@ -29,7 +29,7 @@ class Globals {
     @NonCPS
     public static boolean parentsReady(List<String> parents) {
         for (String parent : parents) {
-            String status = Globals.getStatus(parent)
+            String status = TaskStatus.getStatus(parent)
             if (status == "failed") {
                 throw new Exception("Parent task " + parent + "failed")
             } else if (status != "succeeded") {
@@ -39,20 +39,6 @@ class Globals {
         return true
     }
 
-    @NonCPS
-    public static void registerRunning(String taskName) {
-        Globals.updateStatus(taskName, "running")
-    }
-
-    @NonCPS
-    public static void registerSucceeded(String taskName) {
-        Globals.updateStatus(taskName, "succeeded")
-    }
-
-    @NonCPS
-    public static void registerFailed(String taskName) {
-        Globals.updateStatus(taskName, "failed")
-    }
 }
 
 
@@ -63,8 +49,8 @@ def debug(msg) {
 }
 
 def parentsReady(String taskName, List<String> parents) {
-    debug("checking parents ${parents} of task ${taskName}, current statuses: ${Globals.taskStatuses}")
-    boolean out = Globals.parentsReady(parents)
+    debug("checking parents ${parents} of task ${taskName}, current statuses: ${TaskStatus.taskStatuses}")
+    boolean out = TaskStatus.parentsReady(parents)
     debug("are parents ${parents} of task ${taskName} are ready? ${out}")
     return out
 }
@@ -75,20 +61,14 @@ def waitForParents(String taskName, List<String> parents) {
     }
 }
 
-/*
-def waitForParents(taskName, parents) {
-    Globals.waitForParents(taskName, parents)
-}
-*/
-
 def registerRunning(taskName) {
-    Globals.updateStatus(taskName, "running")
+    TaskStatus.updateStatus(taskName, "running")
 }
 
 def registerSucceeded(taskName) {
-    Globals.updateStatus(taskName, "succeeded")
+    TaskStatus.updateStatus(taskName, "succeeded")
 }
 
 def registerFailed(taskName) {
-    Globals.updateStatus(taskName, "failed")
+    TaskStatus.updateStatus(taskName, "failed")
 }
