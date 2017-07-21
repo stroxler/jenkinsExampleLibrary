@@ -25,32 +25,31 @@ class TaskStatus {
     public static String getStatus(String taskName) {
         return taskStatuses.get(taskName)
     }
-
-    @NonCPS
-    public static boolean parentsReady(List<String> parents) {
-        for (String parent : parents) {
-            String status = TaskStatus.getStatus(parent)
-            if (status == "failed") {
-                throw new Exception("Parent task " + parent + "failed")
-            } else if (status != "succeeded") {
-                return false
-            }
-        }
-        return true
-    }
-
 }
 
 
 def debug(msg) {
     /* Uncomment to enable debugging. I should probably find a better
      * way of controlling this (e.g. an env var) */
-    //println("          [debug]  ${msg}")
+    println("          [debug]  ${msg}")
+}
+
+
+boolean areParentsReady(List<String> parents) {
+    for (String parent : parents) {
+        String status = TaskStatus.getStatus(parent)
+        if (status == "failed") {
+            throw new Exception("Parent task " + parent + "failed")
+        } else if (status != "succeeded") {
+            return false
+        }
+    }
+    return true
 }
 
 def parentsReady(String taskName, List<String> parents) {
     debug("checking parents ${parents} of task ${taskName}, current statuses: ${TaskStatus.taskStatuses}")
-    boolean out = TaskStatus.parentsReady(parents)
+    boolean out = areParentsReady(parents)
     debug("are parents ${parents} of task ${taskName} are ready? ${out}")
     return out
 }
