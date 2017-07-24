@@ -25,12 +25,22 @@ jenkins pipeline plugin, because of a few factors:
 To mostly get around this issue, I wrote a `runtests.py` script that
 copies the whole codebase to a temporary directory, stripping out every
 instance of `@NonCPS` that I find in `src` files, and then runs
-`tests.groovy` with a proper classpath.
+`tests.groovy` with a proper classpath or starts a `groovysh` interactive
+shell.
 
-You can verify that things compile by just importing classes from
-`tests.groovy`, and you could also put in a hacky test script if you wanted
-to verify code behavior (at this point I mostly am happy with just checking
-that it compiles).
+To run tests, execute
+```
+./runtests.py test
+```
+To run the interactive `groovysh`, execute
+```
+./runtests.py groovysh
+```
+
+You'll want to `pip install -r dev-requirements.txt`. You may
+want to use a virtualenv for this. I apologize for the python; at this point
+I am more familiar with python as a bash-like tool, but it would be great
+to translate the code to a jvm language.
 
 Note that if you use any jenkins-specific code in the shared library, you
 cannot test it this way and you should *not* import groovy classes that use

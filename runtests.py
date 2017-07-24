@@ -1,16 +1,33 @@
 #!/usr/bin/env python
+import sys
 import os
 import shutil
 import tempfile
 
+import fire
 import tdx
-from plumbum import cmd
+from plumbum import cmd, FG
 
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-def test_groovy():
+class FireSpec(object):
+    def __init__(self):
+        self.shell = shell
+        self.test = test
+
+
+def shell():
+    tmpd = tempfile.mkdtemp()
+    try:
+        copy_code(this_dir, tmpd)
+        run_shell(tmpd)
+    finally:
+        shutil.rmtree(tmpd)
+
+
+def test():
     tmpd = tempfile.mkdtemp()
     try:
         copy_code(this_dir, tmpd)
@@ -65,8 +82,28 @@ def run_tests(test_dir):
         os.path.join(test_dir, 'vars')
     ])
     test_script = os.path.join(test_dir, 'test.groovy')
-    cmd.groovy['--classpath', classpath, test_script]()
+    cmd.groovy['--classpath', classpath, test_script] & FG
+
+
+def run_shell(test_dir):
+    classpath = ':'.join([
+        os.path.join(test_dir, 'src'),
+        os.path.join(test_dir, 'vars')
+    ])
+    cmd.groovysh['--classpath', classpath] & FG
+
+
+def run_fire():
+    fire.Fire(FireSpec())
+
+
+def main():
+    if '--debug' in sys.argv:
+        sys.argv = [v for v in sys.argv if v != '--debug']
+        tdx.debug()(run_fire)()
+    else:
+        run_fire()
 
 
 if __name__ == '__main__':
-    test_groovy()
+    main()
