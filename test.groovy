@@ -1,4 +1,4 @@
-import com.stroxler.Bar
+import com.stroxler.TaskTracker
 
 import java.util.Map
 import java.util.HashMap

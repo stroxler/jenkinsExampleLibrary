@@ -6,6 +6,41 @@ eye toward allowing airflow-style DAGs of tasks inside jenkins pipelines.
 
 This plugin is a first step toward exploring this possiblility.
 
+## Development
+
+It's not as easy as I might like to develop a shared library for the
+jenkins pipeline plugin, because of a few factors:
+  - If you try to run a task in groovy with any kind of syntax error,
+    you get a pretty useless error message fromt he CPS compiler that
+    doesn't tell you what went wrong.
+  - To make matters worse, you get similar-looking errors if you make some
+    kind of CPS mistake (calling a CPS-transformed method from a
+    non-transformed one, or using non-serializable objects in CPS methods),
+    so it's hard to tell trivial groovy syntax errors from major design
+    issues
+  - A lot of the key code I need to write has to be `@NonCPS`-protected
+  - Because the `@NonCPS` annotation is only defined in jenkins, you can't
+    easily just verify the groovy code locally
+
+To mostly get around this issue, I wrote a `runtests.py` script that
+copies the whole codebase to a temporary directory, stripping out every
+instance of `@NonCPS` that I find in `src` files, and then runs
+`tests.groovy` with a proper classpath.
+
+You can verify that things compile by just importing classes from
+`tests.groovy`, and you could also put in a hacky test script if you wanted
+to verify code behavior (at this point I mostly am happy with just checking
+that it compiles).
+
+Note that if you use any jenkins-specific code in the shared library, you
+cannot test it this way and you should *not* import groovy classes that use
+such code. But if the bulk of your logic is in either non-CPS code that uses
+base groovy / java tooling or in CPS code that only uses generic methods
+(such as sleep, which jenkins redefines but has similar semantics), you can
+test it all using `./runtests.py`.
+
+## Verifying that the shared library works
+
 Here's how I tested it out: I configured my jenkins development instance
 to use this plugin, and then made two copies of a job using this groovy
 script:
@@ -59,3 +94,4 @@ get the desired order of execution in both copies:
   - a1st finishes, then b1st starts and finishes while a2nd starts
   - a2nd finishes and c2nd starts and finishes while a3rd starts
   - a3rd starts and then b2nd runs
+
