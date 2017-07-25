@@ -7,7 +7,69 @@ import java.util.Map
 import java.util.List
 
 
-class TaskStatus {
+
+@groovy.transform.Field def DEBUG
+DEBUG = false
+def setDEBUG(debug) {
+    this.DEBUG = debug
+}
+
+
+def registerRunning(taskName) {
+    TaskStatus.updateStatus(taskName, "running")
+}
+
+
+def registerSucceeded(taskName) {
+    TaskStatus.updateStatus(taskName, "succeeded")
+}
+
+
+def registerFailed(taskName) {
+    TaskStatus.updateStatus(taskName, "failed")
+}
+
+
+def waitForParents(taskName, parents) {
+    while(!parentsReady(taskName, parents)) {
+        sleep(1)
+    }
+}
+
+def parentsReady(String taskName, List<String> parents) {
+    Map<String, String> parentMap = parents.collectEntries {
+        parent -> [parent, true]
+    }
+    parentsReady(taskName, parentMap)
+}
+
+
+def parentsReady(String taskName, Map<String, Boolean> parents) {
+    debug("checking parents ${parents} of task ${taskName}, " +
+          "current statuses: ${TaskStatus.taskStatuses}")
+    boolean ready = areParentsReady(parents)
+    debug("are parents ${parents} of task ${taskName} are ready? ${ready}")
+    return ready
+}
+
+boolean areParentsReady(Map<String, Boolean> parents) {
+    for (String parent : parents.keySet()) {
+        String status = TaskStatus.getStatus(parent);
+        if (status == "failed") {
+            boolean successRequired = parents.get(parent)
+            if (successRequired) {
+              throw new Exception("Parent task " + parent + " failed");
+            } // else continue looping over parents
+        } else if (status != "succeeded") {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+
+public class TaskStatus {
     public static Map<String, String> taskStatuses = new ConcurrentHashMap<>()
 
     @NonCPS
@@ -26,47 +88,23 @@ class TaskStatus {
     }
 }
 
-
 def debug(msg) {
-    /* Uncomment to enable debugging. I should probably find a better
-     * way of controlling this (e.g. an env var) */
-    println("          [debug]  ${msg}")
-}
-
-
-boolean areParentsReady(List<String> parents) {
-    for (String parent : parents) {
-        String status = TaskStatus.getStatus(parent)
-        if (status == "failed") {
-            throw new Exception("Parent task " + parent + "failed")
-        } else if (status != "succeeded") {
-            return false
-        }
-    }
-    return true
-}
-
-def parentsReady(String taskName, List<String> parents) {
-    debug("checking parents ${parents} of task ${taskName}, current statuses: ${TaskStatus.taskStatuses}")
-    boolean out = areParentsReady(parents)
-    debug("are parents ${parents} of task ${taskName} are ready? ${out}")
-    return out
-}
-
-def waitForParents(String taskName, List<String> parents) {
-    while(!parentsReady(taskName, parents)) {
-        sleep(1)
+    if(DEBUG) {
+       println("          [debug]  ${msg}")
     }
 }
 
-def registerRunning(taskName) {
-    TaskStatus.updateStatus(taskName, "running")
+// for testing only
+
+def _task_statuses_() {
+    return TaskStatus.taskStatuses
 }
 
-def registerSucceeded(taskName) {
-    TaskStatus.updateStatus(taskName, "succeeded")
+
+def _set_task_statuses_(statuses) {
+    TaskStatus.taskStatuses = new ConcurrentHashMap<>()
+    for (entry in statuses.entrySet()) {
+        TaskStatus.updateStatus(entry.getKey(), entry.getValue())
+    }
 }
 
-def registerFailed(taskName) {
-    TaskStatus.updateStatus(taskName, "failed")
-}
