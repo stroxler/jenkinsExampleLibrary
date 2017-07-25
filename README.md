@@ -49,7 +49,7 @@ base groovy / java tooling or in CPS code that only uses generic methods
 (such as sleep, which jenkins redefines but has similar semantics), you can
 test it all using `./runtests.py`.
 
-## Verifying that the shared library works
+## Verifying that the shared library works (basic)
 
 Here's how I tested it out: I configured my jenkins development instance
 to use this plugin, and then made two copies of a job using this groovy
@@ -105,3 +105,62 @@ get the desired order of execution in both copies:
   - a2nd finishes and c2nd starts and finishes while a3rd starts
   - a3rd starts and then b2nd runs
 
+
+## Verifying timeouts and some other behaviors (more advanced)
+
+The basic script above was my first test script, when all I tracked
+was task success, and I required all parents to succeed. Here's
+a more complex example that exercises new code for'
+  - making parents optional in root tasks (see "a-1st")
+  - timing out builds (see "a-2nd")
+  - allowing parents to fail (see "c-2nd", which depends on "a-2nd")
+  - failing the pipeline at the very end, if any tasks failed
+
+The output of this script is identical to the simpler example above,
+except that:
+  - the "a-2nd" hello never prints
+  - some tracebacks print in the middle of the pipeline, associated with
+    "a-2nd" timing out and then the sh job getting killed
+  - at the very end, the pipeline reports that "a-2nd" failed, and crashes
+```groovy
+@Library("jenkinsExampleLibrary") _
+
+node {
+    stage("parallel") {
+        parallel([
+            "block a": {
+                runTask("a-1st") {
+                    sh "sleep 5"
+                    echo "hello from a-1st"
+                }
+                runTask("a-2nd", [:], 3) {
+                    sh "sleep 5"
+                    echo "hello from a-2nd"
+                }
+                runTask("a-3rd", []) {
+                    sh "sleep 5"
+                    echo "hello from a-3rd"
+                }
+            },
+            "block b": {
+                runTask "b-1st", ["a-1st"], {
+                    echo "hello from b-1st"
+                }
+                runTask "b-2nd", ["a-3rd"], {
+                    echo "hello from b-2nd"
+                }
+            },
+            "block c": {
+                runTask "c-1st", [], {
+                    echo "hello from c-1st"
+                }
+                runTask "c-2nd", ["a-2nd": false], {
+                    echo "hello from c-2nd"
+                }
+            },
+        ])
+    }
+    
+    checkPipelineStatus()
+}
+```

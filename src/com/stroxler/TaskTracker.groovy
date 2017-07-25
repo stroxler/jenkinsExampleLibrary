@@ -30,6 +30,23 @@ def registerFailed(taskName) {
 }
 
 
+def propagateTaskFailures() {
+    boolean failed = false
+    String failures = ""
+    for (entry in TaskStatus.taskStatuses.entrySet()) {
+        String taskName = entry.getKey()
+        String status = entry.getValue()
+        if (status != 'succeeded') {
+           failed = true
+           failures += "\nTask ${taskName} had non-successful status ${status}"
+        }
+    }
+    if (failed) {
+        throw new Exception("Pipeline had non-successful tasks:" + failures)
+    }
+}
+
+
 def waitForParents(taskName, parents) {
     while(!parentsReady(taskName, parents)) {
         sleep(1)
@@ -52,6 +69,9 @@ def parentsReady(String taskName, Map<String, Boolean> parents) {
     return ready
 }
 
+
+// internals, not part of the public api
+
 boolean areParentsReady(Map<String, Boolean> parents) {
     for (String parent : parents.keySet()) {
         String status = TaskStatus.getStatus(parent);
@@ -66,7 +86,6 @@ boolean areParentsReady(Map<String, Boolean> parents) {
     }
     return true;
 }
-
 
 
 public class TaskStatus {
@@ -88,11 +107,13 @@ public class TaskStatus {
     }
 }
 
+
 def debug(msg) {
     if(DEBUG) {
        println("          [debug]  ${msg}")
     }
 }
+
 
 // for testing only
 

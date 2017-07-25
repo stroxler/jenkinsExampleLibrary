@@ -1,6 +1,9 @@
 import com.stroxler.TaskTracker
 
+// we can't actually run these methods without mocking pipeline plugin
+// internals, but we can check that they compile
 import runTask
+import checkPipelineStatus
 
 import java.util.Map
 import java.util.HashMap
@@ -99,17 +102,36 @@ tests = [
     assert actual == true
   },
 
+  "propagateTaskFailures should be silent if all tasks succeeded": { tt ->
+    tt._set_task_statuses_([
+        "jobA": "succeeded", "jobB": "succeeded",
+    ])
+    tt.propagateTaskFailures()
+  },
+
+  "propagateTaskFailures should be silent if all tasks succeeded": { tt ->
+    tt._set_task_statuses_([
+        "jobA": "succeeded", "jobB": "succeeded", "jobC": "failed",
+    ])
+    out = assertThrowsError { tt.propagateTaskFailures() }
+    assert out.message.contains(
+        "Task jobC had non-successful status failed")
+  },
+
 ]
 
 
 def assertThrowsError(f) {
+    Throwable out = null
     boolean thrown = false;
     try {
         f()
     } catch (Throwable t) {
         thrown = true;
+        out = t;
     }
     assert thrown == true;
+    return out;
 }
 
 
