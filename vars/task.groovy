@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy 
-import com.stroxler.TaskTracker
+import com.stroxler.DagRunner
 
 
 def call(map) {
@@ -16,11 +16,11 @@ def call(taskName, block) {
 
 
 def call(taskName, parents, block) {
-    TaskTracker tt = new TaskTracker()
+    DagRunner dr = new DagRunner()
     return [
         "taskName": taskName,
         "parents": parents,
-        "run": { tt.runTask(taskName, parents, block) },
+        "run": { dr.runTask(taskName, parents, block) },
     ]
 }
 

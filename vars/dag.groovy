@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy 
-import com.stroxler.TaskTracker
+import com.stroxler.DagRunner
 
 
 def call(Map... taskRuns) {
@@ -8,16 +8,16 @@ def call(Map... taskRuns) {
 
 
 def call(List<Map> taskRuns) {
-    TaskTracker taskTracker = new TaskTracker()
+    DagRunner dr = new DagRunner()
 
-    Map runMap = taskTracker.validateAndTransformTaskRuns(taskRuns)
+    Map runMap = dr.validateAndTransformTaskRuns(taskRuns)
 
     stage("dag") {
         parallel(runMap)
     }
 
     stage("check task statuses") {
-       println(taskTracker.reportAndSetBuildStatus(currentBuild))
+       println(dr.reportAndSetBuildStatus(currentBuild))
     }
 }
 

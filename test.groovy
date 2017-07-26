@@ -1,4 +1,4 @@
-import com.stroxler.TaskTracker
+import com.stroxler.DagRunner
 
 // we can't actually run these methods without mocking pipeline plugin
 // internals, but we can check that they compile
@@ -13,97 +13,97 @@ import java.io.StringWriter
 
 tests = [
 
-  "code should compile": { tt ->
+  "code should compile": { dr ->
   },
 
-  "debug field on TaskTracker should work": { tt ->
-    tt.debug("If you see me this is an error")
-    tt.setDEBUG(true)
-    tt.debug("Hi from debugger")
+  "debug field on DagRunner should work": { dr ->
+    dr.debug("If you see me this is an error")
+    dr.setDEBUG(true)
+    dr.debug("Hi from debugger")
   },
 
-  "should be able to register task statuses": { tt ->
-    def ts = tt._task_statuses_()
+  "should be able to register task statuses": { dr ->
+    def ts = dr._task_statuses_()
     // there should be no tasks initially
     assert ts == [:]
     // we should be able to set status to running
-    tt.registerRunning("mytask")
+    dr.registerRunning("mytask")
     assert ts == ["mytask": "running"]
     // we should be able to set status to succeeded
-    tt.registerSucceeded("mytask")
+    dr.registerSucceeded("mytask")
     assert ts == ["mytask": "succeeded"]
     // we should be able to set status to failed
-    tt.registerFailed("mytask2")
+    dr.registerFailed("mytask2")
     assert ts == ["mytask": "succeeded", "mytask2": "failed"]
   },
 
   ("parentsReady should return false if any not ready " +
-   "(as long as no skip)"): { tt ->
-    tt._set_task_statuses_([
+   "(as long as no skip)"): { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed", "taskE": "skipped",
     ])
     boolean actual
-    actual = tt.parentsReady("mytask", ["taskC"])
+    actual = dr.parentsReady("mytask", ["taskC"])
     assert actual == false
-    actual = tt.parentsReady("mytask", ["taskA", "taskC"])
+    actual = dr.parentsReady("mytask", ["taskA", "taskC"])
     assert actual == false
-    actual = tt.parentsReady("mytask", ["succeeded": ["taskA", "taskC"]])
+    actual = dr.parentsReady("mytask", ["succeeded": ["taskA", "taskC"]])
     assert actual == false
     // a task that isn't in the run map at all is not finished
-    actual = tt.parentsReady("mytask", ["taskNotMentioned"])
+    actual = dr.parentsReady("mytask", ["taskNotMentioned"])
     assert actual == false
     // allowing for non-successful parents shouldn't change output
-    actual = tt.parentsReady("mytask", ["completed": ["taskA", "taskC"]])
+    actual = dr.parentsReady("mytask", ["completed": ["taskA", "taskC"]])
     assert actual == false
     // requiring failure shoudn't matter for task C or for an unmentioned task
-    actual = tt.parentsReady("mytask", ["failed": ["taskNotMentioned", "taskC"]])
+    actual = dr.parentsReady("mytask", ["failed": ["taskNotMentioned", "taskC"]])
     assert actual == false
   },
 
-  "parentsReady should return true if all succeeded": { tt ->
-    tt._set_task_statuses_([
+  "parentsReady should return true if all succeeded": { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed", "taskE": "skipped",
     ])
     boolean actual
-    actual = tt.parentsReady("mytask", ["taskA"])
+    actual = dr.parentsReady("mytask", ["taskA"])
     assert actual == true
-    actual = tt.parentsReady("mytask", ["taskA", "taskB"])
+    actual = dr.parentsReady("mytask", ["taskA", "taskB"])
     assert actual == true
-    actual = tt.parentsReady("mytask", ["succeeded": ["taskA", "taskB"]])
+    actual = dr.parentsReady("mytask", ["succeeded": ["taskA", "taskB"]])
     assert actual == true
   },
 
-  "parentsReady should return true if all completed": { tt ->
-    tt._set_task_statuses_([
+  "parentsReady should return true if all completed": { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed", "taskE": "skipped",
     ])
     boolean actual
-    actual = tt.parentsReady("mytask", ["completed": ["taskA", "taskE"]])
+    actual = dr.parentsReady("mytask", ["completed": ["taskA", "taskE"]])
     assert actual == true
-    actual = tt.parentsReady("mytask", ["completed": ["taskA", "taskD"]])
+    actual = dr.parentsReady("mytask", ["completed": ["taskA", "taskD"]])
     assert actual == true
   },
 
-  "parentsReady should return true if all failed (when requested)": { tt ->
-    tt._set_task_statuses_([
+  "parentsReady should return true if all failed (when requested)": { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed",
     ])
     boolean actual
-    actual = tt.parentsReady("mytask", ["failed": ["taskD"]])
+    actual = dr.parentsReady("mytask", ["failed": ["taskD"]])
     assert actual == true
   },
 
-  "parentsReady should return true with mixed requirments": { tt ->
-    tt._set_task_statuses_([
+  "parentsReady should return true with mixed requirments": { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed", "taskE": "skipped",
     ])
     boolean actual
-    actual = tt.parentsReady(
+    actual = dr.parentsReady(
         "mytask",
         ["succeeded": ["taskA"],
          "completed": ["taskB", "taskE"],
@@ -111,57 +111,57 @@ tests = [
     assert actual == true
   },
 
-  "parentsReady should throw an error when task should be skipped": {tt ->
-    tt._set_task_statuses_([
+  "parentsReady should throw an error when task should be skipped": { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed", "taskE": "skipped",
     ])
     assertThrowsError {
-        tt.parentsReady("mytask", ["taskA", "taskE"])
+        dr.parentsReady("mytask", ["taskA", "taskE"])
     }
     assertThrowsError {
-        tt.parentsReady("mytask", ["taskA", "taskD"])
+        dr.parentsReady("mytask", ["taskA", "taskD"])
     }
     assertThrowsError {
-        tt.parentsReady("mytask", ["failed": "taskA"])
+        dr.parentsReady("mytask", ["failed": "taskA"])
     }
     assertThrowsError {
-        tt.parentsReady("mytask", ["failed": "taskE"])
+        dr.parentsReady("mytask", ["failed": "taskE"])
     }
   },
 
-  "collectParents should run properly": { tt ->
+  "collectParents should run properly": { dr ->
     List<String> actual
-    actual = tt.collectParents(["taskA", "taskB", "taskC"])
+    actual = dr.collectParents(["taskA", "taskB", "taskC"])
     assert actual.toSet() == ["taskA", "taskB", "taskC"].toSet()
-    actual = tt.collectParents(["succeeded": ["taskA", "taskB", "taskC"]])
+    actual = dr.collectParents(["succeeded": ["taskA", "taskB", "taskC"]])
     assert actual.toSet() == ["taskA", "taskB", "taskC"].toSet()
-    actual = tt.collectParents(["succeeded": ["taskA", "taskB"],
+    actual = dr.collectParents(["succeeded": ["taskA", "taskB"],
                                 "completed": ["taskC"]])
     assert actual.toSet() == ["taskA", "taskB", "taskC"].toSet()
   },
 
-  "validateAndTransformTaskRuns should throw if a task is malformed": { tt ->
+  "validateAndTransformTaskRuns should throw if a task is malformed": { dr ->
     taskRuns = [
       ["taskName": "taskA", "parents": [:], "run": "A"],
       ["taskName": "taskB", "parents": ["taskA"]],  // missing the "run"
     ]
-    def out = assertThrowsError { tt.validateAndTransformTaskRuns(taskRuns) }
+    def out = assertThrowsError { dr.validateAndTransformTaskRuns(taskRuns) }
     assert out.message.contains("taskName:taskB")
     assert out.message.contains("is missing run")
   },
 
-  "validateAndTransformTaskRuns should throw on nonexistent parents": { tt ->
+  "validateAndTransformTaskRuns should throw on nonexistent parents": { dr ->
     taskRuns = [
       ["taskName": "taskA", "parents": [:], "run": "A"],
       ["taskName": "taskB", "parents": ["taskC", "taskD",], "run": "B"],
     ]
-    def out = assertThrowsError { tt.validateAndTransformTaskRuns(taskRuns) }
+    def out = assertThrowsError { dr.validateAndTransformTaskRuns(taskRuns) }
     assert out.message.contains("TaskRun taskB has nonexistent parents")
     assert out.message.contains("[taskC, taskD]")
   },
 
-  "validateAndTransformTaskRuns should work as intended": { tt ->
+  "validateAndTransformTaskRuns should work as intended": { dr ->
     // note that we use strings instead of closures to bypass the
     // fact that closures are not comparable in groovy
     taskRuns = [
@@ -169,43 +169,43 @@ tests = [
       ["taskName": "taskB", "parents": ["taskA"], "run": "B"],
       ["taskName": "taskC", "parents": ["taskA", "taskB"], "run": "C"],
     ]
-    def out = tt.validateAndTransformTaskRuns(taskRuns)
+    def out = dr.validateAndTransformTaskRuns(taskRuns)
     assert out == ["taskA": "A", "taskB": "B", "taskC": "C", ]
   },
 
-  "runTask should skip task when parents are not ready": { tt ->
+  "runTask should skip task when parents are not ready": { dr ->
     def initial_statuses = [
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed", "taskE": "skipped",
     ]
     def status = "not run"
     // check with succeeded parents
-    tt._set_task_statuses_(initial_statuses)
-    tt.runTask("taskF", ["taskA", "taskD"]) { status = "run" }
+    dr._set_task_statuses_(initial_statuses)
+    dr.runTask("taskF", ["taskA", "taskD"]) { status = "run" }
     assert status == "not run"
-    assert tt._task_statuses_()["taskF"] == "skipped"
+    assert dr._task_statuses_()["taskF"] == "skipped"
     // check with failed parents
-    tt._set_task_statuses_(initial_statuses)
-    tt.runTask("taskF", ["failed": ["taskA", "taskD"]]) { status = "run" }
+    dr._set_task_statuses_(initial_statuses)
+    dr.runTask("taskF", ["failed": ["taskA", "taskD"]]) { status = "run" }
     assert status == "not run"
-    assert tt._task_statuses_()["taskF"] == "skipped"
+    assert dr._task_statuses_()["taskF"] == "skipped"
   },
 
-  "runTask should run when parents are ready": { tt ->
+  "runTask should run when parents are ready": { dr ->
     def initial_statuses = [
         "taskA": "succeeded", "taskB": "succeeded",
         "taskC": "running", "taskD": "failed", "taskE": "skipped",
     ]
     def status = "not run"
-    tt._set_task_statuses_(initial_statuses)
-    tt.runTask("taskF", ["succeeded": ["taskA"], "failed": ["taskD"]]) {
+    dr._set_task_statuses_(initial_statuses)
+    dr.runTask("taskF", ["succeeded": ["taskA"], "failed": ["taskD"]]) {
         status = "run"
     }
     assert status == "run"
-    assert tt._task_statuses_()["taskF"] == "succeeded"
+    assert dr._task_statuses_()["taskF"] == "succeeded"
   },
 
-  "runTask should handle failures in block properly": { tt ->
+  "runTask should handle failures in block properly": { dr ->
     // manual mock, groovy style, see
     // cartesianproduct.wordpress.com/2011/01/30/redirecting-stdout-in-groovy/
     def stdOut = System.out
@@ -218,36 +218,36 @@ tests = [
           "taskC": "running", "taskD": "failed", "taskE": "skipped",
       ]
       def status = "not run"
-      tt._set_task_statuses_(initial_statuses)
-      tt.runTask("taskF", ["succeeded": ["taskA"], "failed": ["taskD"]]) {
+      dr._set_task_statuses_(initial_statuses)
+      dr.runTask("taskF", ["succeeded": ["taskA"], "failed": ["taskD"]]) {
           status = "run"
           throw new Error("oops")
       }
       assert status == "run"
-      assert tt._task_statuses_()["taskF"] == "failed"
+      assert dr._task_statuses_()["taskF"] == "failed"
       assert bufStr.toString().contains("oops")
     } finally {
       System.out = stdOut
     }
   },
 
-  "reportAndSetuBuildStatus should be silent when appropriate": { tt ->
-    tt._set_task_statuses_([
+  "reportAndSetuBuildStatus should be silent when appropriate": { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded", "taskE": "skipped",
     ])
     def currentBuild = [result: 'SUCCESS']
-    out = tt.reportAndSetBuildStatus(currentBuild)
+    out = dr.reportAndSetBuildStatus(currentBuild)
     assert currentBuild.result == 'SUCCESS'
     assert out.contains("Succeeded:\n\t[taskA, taskB]")
     assert out.contains("Skipped:\n\t[taskE]")
   },
 
-  "reportAndSetuBuildStatus should propagate errors properly": { tt ->
-    tt._set_task_statuses_([
+  "reportAndSetuBuildStatus should propagate errors properly": { dr ->
+    dr._set_task_statuses_([
         "taskA": "succeeded", "taskB": "succeeded", "taskC": "failed",
     ])
     def currentBuild = [result: 'SUCCESS']
-    out = tt.reportAndSetBuildStatus(currentBuild)
+    out = dr.reportAndSetBuildStatus(currentBuild)
     assert currentBuild.result == 'FAILURE'
     assert out.contains("Succeeded:\n\t[taskA, taskB]")
     assert out.contains("Failed:\n\t[taskC]")
@@ -279,11 +279,11 @@ def runTest(String testName, boolean enableDebug = false) {
     dotest = tests[testName]
     println("Running test ${testName} -------------------------------")
     try {
-      tt  = new TaskTracker()
+      dr  = new DagRunner()
       if (enableDebug) {
-        tt.setDEBUG(true)
+        dr.setDEBUG(true)
       }
-      dotest(tt)
+      dotest(dr)
       println("Test ${testName} succeeded ---------------------------")
     } catch (Throwable t) {
       println("Test ${testName} FAILED ------------------------------")
