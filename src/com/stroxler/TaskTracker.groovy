@@ -29,14 +29,19 @@ def registerFailed(taskName) {
     TaskStatus.updateStatus(taskName, "failed")
 }
 
+def registerSkipped(taskName) {
+    TaskStatus.updateStatus(taskName, "skipped")
+}
+
 
 def propagateTaskFailures() {
     boolean failed = false
     String failures = ""
+    Set<String> acceptableStatuses = ["succeeded", "skipped"].toSet()
     for (entry in TaskStatus.taskStatuses.entrySet()) {
         String taskName = entry.getKey()
         String status = entry.getValue()
-        if (status != 'succeeded') {
+        if (!acceptableStatuses.contains(status)) {
            failed = true
            failures += "\nTask ${taskName} had non-successful status ${status}"
         }
@@ -48,20 +53,24 @@ def propagateTaskFailures() {
 
 
 def waitForParents(taskName, parents) {
-    while(!parentsReady(taskName, parents)) {
-        sleep(1)
+    try {
+        while(!parentsReady(taskName, parents)) {
+            sleep(1)
+        }
+        return true
+    } catch (SkipTask st) {
+        debug("Skipping task ${taskName} due to parent statuses}")
+        return false
     }
 }
 
-def parentsReady(String taskName, List<String> parents) {
-    Map<String, String> parentMap = parents.collectEntries {
-        parent -> [parent, true]
-    }
+boolean parentsReady(String taskName, List<String> parents) {
+    Map<String, List<String>> parentMap = ["succeeded": parents]
     parentsReady(taskName, parentMap)
 }
 
 
-def parentsReady(String taskName, Map<String, Boolean> parents) {
+boolean parentsReady(String taskName, Map<String,List<String>> parents) {
     debug("checking parents ${parents} of task ${taskName}, " +
           "current statuses: ${TaskStatus.taskStatuses}")
     boolean ready = areParentsReady(parents)
@@ -69,22 +78,48 @@ def parentsReady(String taskName, Map<String, Boolean> parents) {
     return ready
 }
 
-
 // internals, not part of the public api
 
-boolean areParentsReady(Map<String, Boolean> parents) {
-    for (String parent : parents.keySet()) {
+class SkipTask extends Exception {
+    public SkipTask () {}
+}
+
+
+boolean areParentsReady(Map<String, List<String>> parents) {
+    return (
+        areParentsReady(
+            parents.getOrDefault("succeeded", []),
+            ["succeeded"].toSet(),
+            ["failed", "skipped"].toSet()
+        ) &&
+        areParentsReady(
+            parents.getOrDefault("completed", []),
+            ["succeeded", "failed", "skipped"].toSet(),
+            [].toSet()
+        ) &&
+        areParentsReady(
+            parents.getOrDefault("failed", []),
+            ["failed"].toSet(),
+            ["succeeded", "skipped"].toSet()
+        )
+    )
+}
+
+
+boolean areParentsReady(List<String> parents,
+                        Set<String> readyIf,
+                        Set<String> skipIf) {
+    boolean ready = true
+    for (String parent : parents) {
         String status = TaskStatus.getStatus(parent);
-        if (status == "failed") {
-            boolean successRequired = parents.get(parent)
-            if (successRequired) {
-              throw new Exception("Parent task " + parent + " failed");
-            } // else continue looping over parents
-        } else if (status != "succeeded") {
-            return false;
+        if (!readyIf.contains(status)) {
+            ready = false
+            if (skipIf.contains(status)) {
+                throw new SkipTask()
+            }
         }
     }
-    return true;
+    return ready
 }
 
 
@@ -95,7 +130,8 @@ public class TaskStatus {
     public static void updateStatus(String taskName, String status) {
         if (status != "running" &&
             status != "succeeded" &&
-            status != "failed") {
+            status != "failed" &&
+            status != "skipped") {
             throw new Exception("Status \"" + status + "\" not legal")
         }
         taskStatuses.put(taskName, status)

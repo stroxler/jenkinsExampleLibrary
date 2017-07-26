@@ -37,79 +37,104 @@ tests = [
     assert ts == ["mytask": "succeeded", "mytask2": "failed"]
   },
 
-  "parentsReady should return true if all are ready": { tt ->
+  ("parentsReady should return false if any not ready " +
+   "(as long as no skip)"): { tt ->
     tt._set_task_statuses_([
         "jobA": "succeeded", "jobB": "succeeded",
-        "jobC": "running", "jobD": "failed",
+        "jobC": "running", "jobD": "failed", "jobE": "skipped",
     ])
     boolean actual
-    actual = tt.parentsReady("mytask", ["jobA": true])
-    assert actual == true
-    actual = tt.parentsReady("mytask", ["jobA": true, "jobB": true])
-    assert actual == true
-    actual = tt.parentsReady("mytask", ["jobA", "jobB"])
-    assert actual == true
-    // allowing for non-successful parents shouldn't change output
-    actual = tt.parentsReady("mytask", ["jobA": false, "jobB": false])
-    assert actual == true
-  },
-
-  "parentsReady should return false if any not ready": { tt ->
-    tt._set_task_statuses_([
-        "jobA": "succeeded", "jobB": "succeeded",
-        "jobC": "running", "jobD": "failed",
-    ])
-    boolean actual
-    actual = tt.parentsReady("mytask", ["jobC": true])
-    assert actual == false
-    actual = tt.parentsReady("mytask", ["jobA": true, "jobC": true])
+    actual = tt.parentsReady("mytask", ["jobC"])
     assert actual == false
     actual = tt.parentsReady("mytask", ["jobA", "jobC"])
     assert actual == false
+    actual = tt.parentsReady("mytask", ["succeeded": ["jobA", "jobC"]])
+    assert actual == false
     // a job that isn't in the run map at all is not finished
-    actual = tt.parentsReady("mytask", ["jobNotMentioned": true])
+    actual = tt.parentsReady("mytask", ["jobNotMentioned"])
     assert actual == false
     // allowing for non-successful parents shouldn't change output
-    actual = tt.parentsReady("mytask", ["jobA": false, "jobC": false])
+    actual = tt.parentsReady("mytask", ["completed": ["jobA", "jobC"]])
+    assert actual == false
+    // requiring failure shoudn't matter for job C or for an unmentioned job
+    actual = tt.parentsReady("mytask", ["failed": ["jobNotMentioned", "jobC"]])
     assert actual == false
   },
 
-  "parentsReady should throw an error if any failed": {tt ->
+  "parentsReady should return true if all succeeded": { tt ->
+    tt._set_task_statuses_([
+        "jobA": "succeeded", "jobB": "succeeded",
+        "jobC": "running", "jobD": "failed", "jobE": "skipped",
+    ])
+    boolean actual
+    actual = tt.parentsReady("mytask", ["jobA"])
+    assert actual == true
+    actual = tt.parentsReady("mytask", ["jobA", "jobB"])
+    assert actual == true
+    actual = tt.parentsReady("mytask", ["succeeded": ["jobA", "jobB"]])
+    assert actual == true
+  },
+
+  "parentsReady should return true if all completed": { tt ->
+    tt._set_task_statuses_([
+        "jobA": "succeeded", "jobB": "succeeded",
+        "jobC": "running", "jobD": "failed", "jobE": "skipped",
+    ])
+    actual = tt.parentsReady("mytask", ["completed": ["jobA", "jobE"]])
+    assert actual == true
+    actual = tt.parentsReady("mytask", ["completed": ["jobA", "jobD"]])
+    assert actual == true
+  },
+
+  "parentsReady should return true if all failed (when requested)": { tt ->
     tt._set_task_statuses_([
         "jobA": "succeeded", "jobB": "succeeded",
         "jobC": "running", "jobD": "failed",
     ])
+    actual = tt.parentsReady("mytask", ["failed": ["jobD"]])
+    assert actual == true
+  },
+
+  "parentsReady should return true with mixed requirments": { tt ->
+    tt._set_task_statuses_([
+        "jobA": "succeeded", "jobB": "succeeded",
+        "jobC": "running", "jobD": "failed", "jobE": "skipped",
+    ])
+    actual = tt.parentsReady(
+        "mytask",
+        ["succeeded": ["jobA"],
+         "completed": ["jobB", "jobE"],
+         "failed": ["jobD"]])
+    assert actual == true
+  },
+
+  "parentsReady should throw an error when task should be skipped": {tt ->
+    tt._set_task_statuses_([
+        "jobA": "succeeded", "jobB": "succeeded",
+        "jobC": "running", "jobD": "failed", "jobE": "skipped",
+    ])
     assertThrowsError {
-        tt.parentsReady("mytask", ["jobD": true])
-    }
-    assertThrowsError {
-        tt.parentsReady("mytask", ["jobA": true, "jobD": true])
+        tt.parentsReady("mytask", ["jobA", "jobE"])
     }
     assertThrowsError {
         tt.parentsReady("mytask", ["jobA", "jobD"])
     }
+    assertThrowsError {
+        tt.parentsReady("mytask", ["failed": "jobA"])
+    }
+    assertThrowsError {
+        tt.parentsReady("mytask", ["failed": "jobE"])
+    }
   },
 
-  "parentsReady should return true when successRequired is false": { tt ->
+  "propagateTaskFailures should be silent when appropriate": { tt ->
     tt._set_task_statuses_([
-        "jobA": "succeeded", "jobB": "succeeded",
-        "jobC": "running", "jobD": "failed",
-    ])
-    boolean actual
-    actual = tt.parentsReady("mytask", ["jobD": false])
-    assert actual == true
-    actual = tt.parentsReady("mytask", ["jobA": true, "jobD": false])
-    assert actual == true
-  },
-
-  "propagateTaskFailures should be silent if all tasks succeeded": { tt ->
-    tt._set_task_statuses_([
-        "jobA": "succeeded", "jobB": "succeeded",
+        "jobA": "succeeded", "jobB": "succeeded", "jobE": "skipped",
     ])
     tt.propagateTaskFailures()
   },
 
-  "propagateTaskFailures should be silent if all tasks succeeded": { tt ->
+  "propagateTaskFailures should propagate errors properly": { tt ->
     tt._set_task_statuses_([
         "jobA": "succeeded", "jobB": "succeeded", "jobC": "failed",
     ])
@@ -122,16 +147,14 @@ tests = [
 
 
 def assertThrowsError(f) {
-    Throwable out = null
-    boolean thrown = false;
+    Throwable thrown = null
     try {
         f()
     } catch (Throwable t) {
-        thrown = true;
-        out = t;
+        thrown = t;
     }
-    assert thrown == true;
-    return out;
+    assert thrown != null;
+    return thrown;
 }
 
 
