@@ -6,7 +6,9 @@ eye toward allowing airflow-style DAGs of tasks inside jenkins pipelines.
 
 This plugin is a first step toward exploring this possiblility.
 
-## Development
+## Development (testing)
+
+### Why set up local tests?
 
 It's not as easy as I might like to develop a shared library for the
 jenkins pipeline plugin, because of a few factors:
@@ -22,7 +24,9 @@ jenkins pipeline plugin, because of a few factors:
   - Because the `@NonCPS` annotation is only defined in jenkins, you can't
     easily just verify the groovy code locally
 
-To mostly get around this issue, I wrote a `runtests.py` script that
+### How do I run tests?
+
+To mostly get around this issue, I wrote a `run.py` script that
 copies the whole codebase to a temporary directory, stripping out every
 instance of `@NonCPS` that I find in `src` files, and then runs
 `tests.groovy` with a proper classpath or starts a `groovysh` interactive
@@ -30,142 +34,47 @@ shell.
 
 To run tests, execute
 ```
-./runtests.py test
+./run.py test
 ```
 To run the interactive `groovysh`, execute
 ```
-./runtests.py groovysh
+./run.py groovysh
 ```
+
+### Installing the python dependencies
+
+You'll want to `pip install -r dev-requirements.txt`. You may
+want to use a virtualenv for this. I apologize for the python; at this point
+I am more familiar with python as process-starting scripting tool, but it would
+be great to translate the code to groovy or ammonite.
+
+### How the tests work
 
 The tests are basically a hand-rolled test framework at the moment, because
 I tried using groovy's junit support and it felt like without a bunch of
 customization that I don't know how to do both the code and the output were
 less readable than the current code.
 
-You'll want to `pip install -r dev-requirements.txt`. You may
-want to use a virtualenv for this. I apologize for the python; at this point
-I am more familiar with python as a bash-like tool, but it would be great
-to translate the code to a jvm language.
-
 Note that if you use any jenkins-specific code in the shared library, you
-cannot test it this way and you should *not* import groovy classes that use
-such code. But if the bulk of your logic is in either non-CPS code that uses
-base groovy / java tooling or in CPS code that only uses generic methods
-(such as sleep, which jenkins redefines but has similar semantics), you can
-test it all using `./runtests.py`.
+cannot test it this way unless you extend the setup to include mocking the
+jenkins specific code.
 
 ## Verifying that the shared library works (basic)
 
-Here's how I tested it out: I configured my jenkins development instance
-to use this plugin, and then made two copies of a job using this groovy
-script:
-```groovy
-@Library("jenkinsExampleLibrary") _
+There are a few example Jenkinsfiles in groovy scripts, and there's an
+ammonite scala script to upload them to a local jenkins instance
+(assumed to be running on port 49001, with a user "dev" having password
+"dev" - you can hack the script to modify it, feel free to make a PR that
+moves this into a json file or some such).
 
-node {
-    stage("parallel") {
-        parallel([
-            "block a": {
-                runTask "a-1st", [], {
-                    sh "sleep 5"
-                    echo "hello from a-1st"
-                }
-                runTask "a-2nd", [], {
-                    sh "sleep 5"
-                    echo "hello from a-2nd"
-                }
-                runTask "a-3rd", [], {
-                    sh "sleep 5"
-                    echo "hello from a-3rd"
-                }
-            },
-            "block b": {
-                runTask "b-1st", ["a-1st"], {
-                    echo "hello from b-1st"
-                }
-                runTask "b-2nd", ["a-3rd"], {
-                    echo "hello from b-2nd"
-                }
-            },
-            "block c": {
-                runTask "c-1st", [], {
-                    echo "hello from c-1st"
-                }
-                runTask "c-2nd", ["a-2nd"], {
-                    echo "hello from c-2nd"
-                }
-            },
-        ])
-    }
-}
+To use it, run
 ```
-
-Then I ran both pipelines at about the same time.
-
-The test verifies that we are able to run two pipelines at once and
-get the desired order of execution in both copies:
-  - a1st and c1st start together
-  - c1st finishes first
-  - a1st finishes, then b1st starts and finishes while a2nd starts
-  - a2nd finishes and c2nd starts and finishes while a3rd starts
-  - a3rd starts and then b2nd runs
-
-
-## Verifying timeouts and some other behaviors (more advanced)
-
-The basic script above was my first test script, when all I tracked
-was task success, and I required all parents to succeed. Here's
-a more complex example that exercises new code for'
-  - making parents optional in root tasks (see "a-1st")
-  - timing out builds (see "a-2nd")
-  - allowing parents to fail (see "c-2nd", which depends on "a-2nd")
-  - failing the pipeline at the very end, if any tasks failed
-
-The output of this script is identical to the simpler example above,
-except that:
-  - the "a-2nd" hello never prints
-  - some tracebacks print in the middle of the pipeline, associated with
-    "a-2nd" timing out and then the sh job getting killed
-  - at the very end, the pipeline reports that "a-2nd" failed, and crashes
-```groovy
-@Library("jenkinsExampleLibrary") _
-
-node {
-    stage("parallel") {
-        parallel([
-            "block a": {
-                runTask("a-1st") {
-                    sh "sleep 5"
-                    echo "hello from a-1st"
-                }
-                runTask("a-2nd", [:], 3) {
-                    sh "sleep 5"
-                    echo "hello from a-2nd"
-                }
-                runTask("a-3rd", []) {
-                    sh "sleep 5"
-                    echo "hello from a-3rd"
-                }
-            },
-            "block b": {
-                runTask "b-1st", ["a-1st"], {
-                    echo "hello from b-1st"
-                }
-                runTask "b-2nd", ["a-3rd"], {
-                    echo "hello from b-2nd"
-                }
-            },
-            "block c": {
-                runTask "c-1st", [], {
-                    echo "hello from c-1st"
-                }
-                runTask "c-2nd", ["a-2nd": false], {
-                    echo "hello from c-2nd"
-                }
-            },
-        ])
-    }
-    
-    checkPipelineStatus()
-}
+./uploadTestJob.scala complexExample
+./uploadTestJob.scala basicExample
 ```
+and navigate to `http://localhost:49001/job/basicExample/` or
+`http://localhost:49001/job/complexExample/`.
+
+The example jobs will state in their descriptions both the expected
+status after tasks run and the groovy code they contain. The `basicExample`
+should end in success, the `complexExample` should end in failure.
