@@ -37,6 +37,11 @@ To run the interactive `groovysh`, execute
 ./runtests.py groovysh
 ```
 
+The tests are basically a hand-rolled test framework at the moment, because
+I tried using groovy's junit support and it felt like without a bunch of
+customization that I don't know how to do both the code and the output were
+less readable than the current code.
+
 You'll want to `pip install -r dev-requirements.txt`. You may
 want to use a virtualenv for this. I apologize for the python; at this point
 I am more familiar with python as a bash-like tool, but it would be great
