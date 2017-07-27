@@ -6,6 +6,29 @@ eye toward allowing airflow-style DAGs of tasks inside jenkins pipelines.
 
 This plugin is a first step toward exploring this possiblility.
 
+## Conclusions and design notes
+
+I'm very satisfied at this point with the overall functionality, so I'm
+wrapping up this demo project. Feel free to use it as an example for developing
+nontrivial shared groovy library logic for jenkins pipelines.
+
+I think my mini testing tool (see run.py and test.groovy) are a pretty good
+solution to the issues of verifying that groovy code will run in jenkins
+and get quick turnaround.
+
+The core Dag management system in `src` is a good example of how to code
+up serious functionality in a groovy shared library; it's pretty well-tested,
+although the code is a bit messy and probably isn't idiomatic.
+
+Moving forward, I'll be working on a similar system for Stitch Fix internal
+usage, and the one major design change I intend to make is to switch from
+a dict of lists for `parents` to a list of dicts: each parent ought to be a
+small dict with its task id and the ending states for which we should
+run (as opposed to skip) this task. We could default the states to be
+`["SUCCEEDED"]`. This is a finer-grained model that I think would be easier
+for users to get accustomed to, and also better supports certain use cases than
+what I have here.
+
 ## Development (testing)
 
 ### Why set up local tests?
